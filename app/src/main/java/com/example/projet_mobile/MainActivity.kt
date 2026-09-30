@@ -12,6 +12,11 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -25,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import com.example.projet_mobile.ui.theme.ProjetmobileTheme
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
 
@@ -33,9 +39,30 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             ProjetmobileTheme {
-                FoodgoSplashScreen()
+                FoodgoApp()
             }
         }
+    }
+}
+
+@Composable
+fun FoodgoApp() {
+
+    // Au lancement, afficher le Splash Screen
+    var showSplash by remember {
+        mutableStateOf(true)
+    }
+
+    // Attendre 10 secondes puis afficher la page d'accueil
+    LaunchedEffect(Unit) {
+        delay(10_000)
+        showSplash = false
+    }
+
+    if (showSplash) {
+        FoodgoSplashScreen()
+    } else {
+        FoodgoHomeScreen()
     }
 }
 
@@ -61,9 +88,9 @@ fun FoodgoSplashScreen() {
         val screenWidth = maxWidth
         val screenHeight = maxHeight
 
-        // =========================================================
+        // =====================================================
         // LOGO FOODGO
-        // =========================================================
+        // =====================================================
 
         Text(
             text = "Foodgo",
@@ -72,7 +99,6 @@ fun FoodgoSplashScreen() {
             fontFamily = FontFamily.Cursive,
             fontWeight = FontWeight.Bold,
             fontStyle = FontStyle.Italic,
-
             modifier = Modifier
                 .align(Alignment.Center)
                 .offset(
@@ -80,9 +106,9 @@ fun FoodgoSplashScreen() {
                 )
         )
 
-        // =========================================================
+        // =====================================================
         // GRAND BURGER À GAUCHE
-        // =========================================================
+        // =====================================================
 
         Image(
             painter = painterResource(
@@ -90,7 +116,6 @@ fun FoodgoSplashScreen() {
             ),
             contentDescription = "Grand hamburger",
             contentScale = ContentScale.Fit,
-
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .offset(
@@ -101,9 +126,9 @@ fun FoodgoSplashScreen() {
                 .height(screenHeight * 0.38f)
         )
 
-        // =========================================================
-        // PETIT BURGER À DROITE
-        // =========================================================
+        // =====================================================
+        // BURGER À DROITE
+        // =====================================================
 
         Image(
             painter = painterResource(
@@ -111,7 +136,6 @@ fun FoodgoSplashScreen() {
             ),
             contentDescription = "Petit hamburger",
             contentScale = ContentScale.Fit,
-
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .offset(
@@ -126,7 +150,7 @@ fun FoodgoSplashScreen() {
 
 
 // =============================================================
-// PREVIEW ANDROID STUDIO
+// PREVIEW DU SPLASH SCREEN
 // =============================================================
 
 @Preview(
@@ -135,7 +159,6 @@ fun FoodgoSplashScreen() {
 )
 @Composable
 fun FoodgoSplashPreview() {
-
     ProjetmobileTheme {
         FoodgoSplashScreen()
     }
