@@ -1,8 +1,14 @@
 package com.example.projet_mobile
 
+import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -13,23 +19,38 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +70,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.projet_mobile.ui.theme.FoodBackground
+import com.example.projet_mobile.ui.theme.FoodDark
 import com.example.projet_mobile.ui.theme.ProjetmobileTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -56,9 +80,20 @@ import kotlinx.coroutines.launch
 // Durée du splash (mets 3_000L si le 10 s n'est pas imposé)
 private const val SPLASH_DURATION_MS = 10_000L
 
+// Index des onglets de la barre du bas
+private const val TAB_HOME = 0
+private const val TAB_FAVORITES = 1
+private const val TAB_CART = 2
+private const val TAB_ORDERS = 3
+private const val TAB_PROFILE = 4
+
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT)
+        )
         super.onCreate(savedInstanceState)
 
         setContent {
@@ -71,23 +106,145 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun FoodgoApp() {
-
-    var showSplash by remember { mutableStateOf(true) }
+    // Le ViewModel est créé tout de suite : le menu se télécharge pendant le splash
+    val vm: FoodViewModel = viewModel()
+    var showSplash by rememberSaveable { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
-        delay(SPLASH_DURATION_MS)
-        showSplash = false
+        if (showSplash) {
+            delay(SPLASH_DURATION_MS)
+            showSplash = false
+        }
     }
 
-    // Fondu enchaîné entre le splash et l'accueil
+    // Fondu enchaîné entre le splash et l'application
     Crossfade(
         targetState = showSplash,
         animationSpec = tween(durationMillis = 700),
         label = "splashToHome"
     ) { splash ->
-        if (splash) FoodgoSplashScreen() else FoodgoHomeScreen()
+        if (splash) FoodgoSplashScreen() else FoodgoMain(vm)
     }
 }
+
+// =============================================================
+// APPLICATION PRINCIPALE : onglets + écran détail
+// =============================================================
+
+@Composable
+fun FoodgoMain(vm: FoodViewModel) {
+    var tab by rememberSaveable { mutableIntStateOf(TAB_HOME) }
+    var detailId by rememberSaveable { mutableStateOf<String?>(null) }
+    var lastDetailId by remember { mutableStateOf<String?>(null) }
+
+    val cartCount by vm.cartCount.collectAsState()
+    val snackbarHost = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        vm.messages.collect { message ->
+            snackbarHost.currentSnackbarData?.dismiss()
+            launch { snackbarHost.showSnackbar(message) }
+        }
+    }
+
+    // Bouton retour : ferme le détail, sinon revient à l'accueil
+    BackHandler(enabled = detailId != null) { detailId = null }
+    BackHandler(enabled = detailId == null && tab != TAB_HOME) { tab = TAB_HOME }
+
+    val openMeal: (String) -> Unit = { id ->
+        lastDetailId = id
+        detailId = id
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+
+        Scaffold(
+            containerColor = FoodBackground,
+            bottomBar = {
+                FoodgoBottomBar(
+                    selected = tab,
+                    cartCount = cartCount,
+                    onSelect = { tab = it }
+                )
+            },
+            snackbarHost = {
+                SnackbarHost(snackbarHost) { data ->
+                    Snackbar(
+                        snackbarData = data,
+                        containerColor = FoodDark,
+                        contentColor = Color.White,
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                }
+            }
+        ) { innerPadding ->
+
+            AnimatedContent(
+                targetState = tab,
+                transitionSpec = {
+                    (fadeIn(tween(250)) + slideInVertically(tween(250)) { it / 20 }) togetherWith
+                            fadeOut(tween(150))
+                },
+                label = "tabs"
+            ) { currentTab ->
+                when (currentTab) {
+                    TAB_HOME -> FoodgoHomeScreen(
+                        vm = vm,
+                        contentPadding = innerPadding,
+                        onOpenMeal = openMeal,
+                        onOpenProfile = { tab = TAB_PROFILE }
+                    )
+
+                    TAB_FAVORITES -> FavoritesScreen(
+                        vm = vm,
+                        contentPadding = innerPadding,
+                        onOpenMeal = openMeal,
+                        onBrowse = { tab = TAB_HOME }
+                    )
+
+                    TAB_CART -> CartScreen(
+                        vm = vm,
+                        contentPadding = innerPadding,
+                        onOpenMeal = openMeal,
+                        onBrowse = { tab = TAB_HOME },
+                        onSeeOrders = { tab = TAB_ORDERS },
+                        onEditAddress = { tab = TAB_PROFILE }
+                    )
+
+                    TAB_ORDERS -> OrdersScreen(
+                        vm = vm,
+                        contentPadding = innerPadding,
+                        onBrowse = { tab = TAB_HOME },
+                        onGoToCart = { tab = TAB_CART }
+                    )
+
+                    else -> ProfileScreen(
+                        vm = vm,
+                        contentPadding = innerPadding,
+                        onSeeOrders = { tab = TAB_ORDERS },
+                        onSeeFavorites = { tab = TAB_FAVORITES }
+                    )
+                }
+            }
+        }
+
+        // Écran détail qui glisse par-dessus tout
+        AnimatedVisibility(
+            visible = detailId != null,
+            enter = slideInVertically(tween(350)) { it } + fadeIn(tween(250)),
+            exit = slideOutVertically(tween(300)) { it } + fadeOut(tween(250))
+        ) {
+            val id = detailId ?: lastDetailId
+            if (id != null) {
+                MealDetailScreen(vm = vm, mealId = id, onBack = { detailId = null })
+            }
+        }
+    }
+}
+
+// =============================================================
+// SPLASH SCREEN
+// =============================================================
 
 @Composable
 fun FoodgoSplashScreen() {
@@ -293,10 +450,7 @@ fun FoodgoSplashScreen() {
 // PREVIEW DU SPLASH SCREEN
 // =============================================================
 
-@Preview(
-    showBackground = true,
-    showSystemUi = true
-)
+@Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun FoodgoSplashPreview() {
     ProjetmobileTheme {
