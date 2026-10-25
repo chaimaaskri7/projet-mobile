@@ -1,31 +1,36 @@
+@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+
 package com.example.projet_mobile
 
-import androidx.compose.animation.AnimatedContent
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -38,365 +43,244 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import kotlinx.coroutines.Dispatchers
+import com.example.projet_mobile.data.CategoryEntity
+import com.example.projet_mobile.data.ProfileEntity
+import com.example.projet_mobile.ui.theme.*
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-
-private val FoodRed = Color(0xFFF3233D)
-private val FoodRedLight = Color(0xFFFF6B7A)
-private val FoodBackground = Color(0xFFF8F8FA)
-private val FoodText = Color(0xFF303038)
-private val FoodGray = Color(0xFF85858D)
-private val FoodGradient = Brush.linearGradient(listOf(FoodRedLight, FoodRed))
-
-private val categories = listOf(
-    "All" to "🍽️",
-    "Beef" to "🥩",
-    "Chicken" to "🍗",
-    "Lamb" to "🍖",
-    "Miscellaneous" to "✨"
-)
 
 // =============================================================
 // ÉCRAN D'ACCUEIL
 // =============================================================
 
 @Composable
-fun FoodgoHomeScreen() {
-
-    var searchText by remember { mutableStateOf("") }
-    var submittedQuery by remember { mutableStateOf("burger") }
-    var retryKey by remember { mutableIntStateOf(0) }
-    var selectedCategory by remember { mutableStateOf("All") }
-    var selectedNav by remember { mutableIntStateOf(0) }
-    var meals by remember { mutableStateOf<List<Meal>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var favorites by remember { mutableStateOf(setOf<String>()) }
-
-    // Appel API au lancement, à chaque recherche et à chaque "Réessayer"
-    LaunchedEffect(submittedQuery, retryKey) {
-        loading = true
-        error = null
-
-        try {
-            val response = withContext(Dispatchers.IO) {
-                MealApi.service.searchMeals(submittedQuery)
-            }
-            meals = response.meals.orEmpty()
-        } catch (e: Exception) {
-            error = "Impossible de charger les repas."
-        } finally {
-            loading = false
-        }
-    }
-
-    val filteredMeals = meals.filter { meal ->
-        val matchesCategory =
-            selectedCategory == "All" ||
-                    meal.strCategory.equals(selectedCategory, ignoreCase = true)
-        val matchesFavorites = selectedNav != 1 || meal.idMeal in favorites
-        matchesCategory && matchesFavorites
-    }
-
-    fun submitSearch() {
-        if (searchText.isNotBlank()) {
-            submittedQuery = searchText.trim()
-            selectedCategory = "All"
-            selectedNav = 0
-        }
-    }
-
-    Scaffold(
-        containerColor = FoodBackground,
-        bottomBar = {
-            FoodgoBottomBar(
-                selected = selectedNav,
-                onSelect = { selectedNav = it }
-            )
-        }
-    ) { innerPadding ->
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = 12.dp,
-                bottom = 20.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-
-            // HEADER
-            item {
-                StaggeredEntrance(index = 0, modifier = Modifier.fillMaxWidth()) {
-                    HomeHeader()
-                }
-            }
-
-            // RECHERCHE
-            item {
-                StaggeredEntrance(index = 1, modifier = Modifier.fillMaxWidth()) {
-                    SearchRow(
-                        value = searchText,
-                        onValueChange = { searchText = it },
-                        onSearch = ::submitSearch
-                    )
-                }
-            }
-
-            // BANNIÈRE (uniquement sur l'accueil)
-            if (selectedNav == 0) {
-                item {
-                    StaggeredEntrance(index = 2, modifier = Modifier.fillMaxWidth()) {
-                        PromoBanner()
-                    }
-                }
-            }
-
-            // FILTRES
-            item {
-                StaggeredEntrance(index = 3, modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        categories.forEach { (name, emoji) ->
-                            CategoryChip(
-                                label = "$emoji  $name",
-                                selected = name == selectedCategory,
-                                onClick = { selectedCategory = name }
-                            )
-                        }
-                    }
-                }
-            }
-
-            // TITRE DE LA LISTE
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    AnimatedContent(
-                        targetState = selectedNav == 1,
-                        label = "listTitle"
-                    ) { showFavorites ->
-                        Text(
-                            text = if (showFavorites) "My favourites" else "Popular burgers",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = FoodText
-                        )
-                    }
-
-                    if (!loading && error == null) {
-                        Text(
-                            text = "${filteredMeals.size} results",
-                            fontSize = 12.sp,
-                            color = FoodGray
-                        )
-                    }
-                }
-            }
-
-            // CHARGEMENT : cartes "skeleton" avec effet shimmer
-            if (loading) {
-                items(3) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        SkeletonCard(Modifier.weight(1f))
-                        SkeletonCard(Modifier.weight(1f))
-                    }
-                }
-            }
-
-            // ERREUR
-            if (!loading && error != null) {
-                item {
-                    ErrorState(
-                        message = error.orEmpty(),
-                        onRetry = { retryKey++ }
-                    )
-                }
-            }
-
-            // CARTES EN GRILLE : 2 PAR LIGNE, apparition échelonnée
-            if (!loading && error == null) {
-                val rows = filteredMeals.chunked(2)
-
-                if (rows.isEmpty()) {
-                    item { EmptyState(isFavorites = selectedNav == 1) }
-                }
-
-                itemsIndexed(
-                    items = rows,
-                    key = { _, row -> row.first().idMeal }
-                ) { rowIndex, rowMeals ->
-                    StaggeredEntrance(
-                        index = rowIndex,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            rowMeals.forEach { meal ->
-                                MealCard(
-                                    meal = meal,
-                                    isFavorite = meal.idMeal in favorites,
-                                    onFavoriteClick = {
-                                        favorites =
-                                            if (meal.idMeal in favorites) favorites - meal.idMeal
-                                            else favorites + meal.idMeal
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-
-                            if (rowMeals.size == 1) {
-                                Spacer(Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// =============================================================
-// ANIMATIONS RÉUTILISABLES
-// =============================================================
-
-/** Fondu + glissement + léger zoom à l'apparition, décalé selon l'index. */
-@Composable
-private fun StaggeredEntrance(
-    index: Int,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+fun FoodgoHomeScreen(
+    vm: FoodViewModel,
+    contentPadding: PaddingValues,
+    onOpenMeal: (String) -> Unit,
+    onOpenProfile: () -> Unit
 ) {
-    val progress = remember { Animatable(0f) }
+    val meals by vm.meals.collectAsState()
+    val categories by vm.categories.collectAsState()
+    val selectedCategory by vm.selectedCategory.collectAsState()
+    val query by vm.query.collectAsState()
+    val sortMode by vm.sortMode.collectAsState()
+    val favoriteIds by vm.favoriteIds.collectAsState()
+    val sync by vm.sync.collectAsState()
+    val profile by vm.profile.collectAsState()
 
-    LaunchedEffect(Unit) {
-        delay((index * 70L).coerceAtMost(420L))
-        progress.animateTo(
-            1f,
-            spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessLow)
-        )
-    }
+    val list = meals
+    val showSkeleton = list == null || (sync.loading && list.isEmpty())
 
-    Box(
-        modifier = modifier.graphicsLayer {
-            val p = progress.value
-            alpha = p.coerceIn(0f, 1f)
-            translationY = (1f - p) * 48.dp.toPx()
-            val s = 0.94f + 0.06f * p
-            scaleX = s
-            scaleY = s
-        }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = contentPadding.calculateTopPadding() + 8.dp,
+            bottom = contentPadding.calculateBottomPadding() + 16.dp
+        ),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        content()
+
+        fullWidth("header") {
+            StaggeredEntrance(index = 0) {
+                HomeHeader(profile = profile, onAvatarClick = onOpenProfile)
+            }
+        }
+
+        fullWidth("search") {
+            StaggeredEntrance(index = 1) {
+                SearchRow(
+                    value = query,
+                    onValueChange = vm::onQueryChange,
+                    sortMode = sortMode,
+                    onSortChange = vm::setSort
+                )
+            }
+        }
+
+        if (sync.offline) {
+            fullWidth("offline") { OfflinePill(onRetry = { vm.sync(force = true) }) }
+        }
+
+        if (query.isBlank()) {
+            fullWidth("promo") {
+                StaggeredEntrance(index = 2) {
+                    PromoCarousel(
+                        categories = categories,
+                        onPromoClick = { category -> vm.selectCategory(category) }
+                    )
+                }
+            }
+        }
+
+        fullWidth("categories") {
+            StaggeredEntrance(index = 3) {
+                CategoriesRow(
+                    categories = categories,
+                    selected = selectedCategory,
+                    onSelect = vm::selectCategory
+                )
+            }
+        }
+
+        fullWidth("title") {
+            val title = when {
+                query.isNotBlank() -> "Résultats pour « ${query.trim()} »"
+                selectedCategory == "All" -> "Populaires"
+                else -> selectedCategory
+            }
+            SectionHeader(title = title) {
+                if (!showSkeleton) {
+                    Text(
+                        text = "${list?.size ?: 0} plats",
+                        fontSize = 13.sp,
+                        color = FoodGray
+                    )
+                }
+            }
+        }
+
+        when {
+            showSkeleton -> {
+                items(6) { SkeletonCard() }
+            }
+
+            sync.error != null && list.isNullOrEmpty() -> {
+                fullWidth("error") {
+                    EmptyState(
+                        icon = Icons.Default.CloudOff,
+                        title = "Oups, pas de connexion",
+                        subtitle = sync.error.orEmpty(),
+                        actionLabel = "Réessayer",
+                        onAction = { vm.sync(force = true) }
+                    )
+                }
+            }
+
+            list.isNullOrEmpty() -> {
+                fullWidth("empty") {
+                    EmptyState(
+                        icon = Icons.Default.Search,
+                        title = "Aucun plat trouvé",
+                        subtitle = "Essaie un autre mot-clé ou une autre catégorie.",
+                        actionLabel = "Tout afficher",
+                        onAction = {
+                            vm.onQueryChange("")
+                            vm.selectCategory("All")
+                        }
+                    )
+                }
+            }
+
+            else -> {
+                itemsIndexed(list.orEmpty(), key = { _, meal -> meal.id }) { index, meal ->
+                    StaggeredEntrance(index = index) {
+                        MealCard(
+                            meal = meal,
+                            isFavorite = meal.id in favoriteIds,
+                            onClick = { onOpenMeal(meal.id) },
+                            onFavoriteClick = { vm.toggleFavorite(meal) },
+                            onAddClick = { vm.addToCart(meal) }
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
-/** Reflet qui traverse la zone (effet "skeleton loading"). */
-@Composable
-private fun Modifier.shimmer(): Modifier {
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val x by transition.animateFloat(
-        initialValue = -400f,
-        targetValue = 1200f,
-        animationSpec = infiniteRepeatable(tween(1200, easing = LinearEasing)),
-        label = "shimmerX"
-    )
-    return this.background(
-        Brush.linearGradient(
-            colors = listOf(Color(0xFFE9E9EE), Color(0xFFF7F7FA), Color(0xFFE9E9EE)),
-            start = Offset(x, 0f),
-            end = Offset(x + 400f, 400f)
-        )
-    )
+/** Élément qui prend toute la largeur de la grille. */
+private fun LazyGridScope.fullWidth(key: String, content: @Composable () -> Unit) {
+    item(key = key, span = { GridItemSpan(maxLineSpan) }) { content() }
 }
 
 // =============================================================
-// COMPOSANTS
+// EN-TÊTE
 // =============================================================
 
 @Composable
-private fun HomeHeader() {
+private fun HomeHeader(profile: ProfileEntity?, onAvatarClick: () -> Unit) {
+    val firstName = profile?.name?.trim()?.split(" ")?.firstOrNull()?.takeIf { it.isNotBlank() }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "Foodgo",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = FoodText
+                fontSize = 40.sp,
+                fontFamily = FontFamily.Cursive,
+                fontWeight = FontWeight.Bold,
+                fontStyle = FontStyle.Italic,
+                color = FoodRed
             )
             Text(
-                text = "Order your favourite food!",
+                text = if (firstName != null) "Bonjour $firstName, qu'est-ce qui te fait envie ?"
+                else "Qu'est-ce qui te fait envie aujourd'hui ?",
                 fontSize = 14.sp,
-                color = FoodGray
+                color = FoodGray,
+                maxLines = 2
             )
         }
 
+        Spacer(Modifier.width(12.dp))
+
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(52.dp)
                 .border(2.dp, FoodGradient, CircleShape)
                 .padding(4.dp)
                 .clip(CircleShape)
-                .background(Color.White),
+                .background(FoodRedSoft)
+                .clickable(onClick = onAvatarClick),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Person,
-                contentDescription = "Profil",
-                tint = FoodRed,
-                modifier = Modifier.size(26.dp)
-            )
+            if (firstName != null) {
+                Text(
+                    text = firstName.take(1).uppercase(),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = FoodRed
+                )
+            } else {
+                Icon(Icons.Default.Person, contentDescription = "Profil", tint = FoodRed)
+            }
         }
     }
 }
+
+// =============================================================
+// RECHERCHE + TRI
+// =============================================================
 
 @Composable
 private fun SearchRow(
     value: String,
     onValueChange: (String) -> Unit,
-    onSearch: () -> Unit
+    sortMode: SortMode,
+    onSortChange: (SortMode) -> Unit
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val buttonScale by animateFloatAsState(
-        targetValue = if (pressed) 0.9f else 1f,
-        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium),
-        label = "searchBtn"
-    )
+    val focusManager = LocalFocusManager.current
+    var sortMenuOpen by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -409,14 +293,9 @@ private fun SearchRow(
             modifier = Modifier
                 .weight(1f)
                 .height(56.dp)
-                .shadow(
-                    elevation = 8.dp,
-                    shape = RoundedCornerShape(18.dp),
-                    ambientColor = Color(0x1A000000),
-                    spotColor = Color(0x1A000000)
-                ),
+                .softShadow(radius = 18.dp, elevation = 8.dp, color = Color(0x16000000)),
             placeholder = {
-                Text("Search your favourite food", fontSize = 14.sp, color = FoodGray)
+                Text("Pizza, poulet, Italian…", fontSize = 14.sp, color = FoodGray)
             },
             leadingIcon = {
                 Icon(Icons.Default.Search, contentDescription = null, tint = FoodRed)
@@ -428,101 +307,204 @@ private fun SearchRow(
                     exit = fadeOut() + scaleOut()
                 ) {
                     IconButton(onClick = { onValueChange("") }) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = "Effacer",
-                            tint = FoodGray
-                        )
+                        Icon(Icons.Default.Close, contentDescription = "Effacer", tint = FoodGray)
                     }
                 }
             },
             singleLine = true,
             shape = RoundedCornerShape(18.dp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color.Transparent,
+                focusedBorderColor = FoodRed.copy(alpha = 0.4f),
                 unfocusedBorderColor = Color.Transparent,
                 focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White
+                unfocusedContainerColor = Color.White,
+                cursorColor = FoodRed
             )
         )
 
-        IconButton(
-            onClick = onSearch,
-            interactionSource = interaction,
-            modifier = Modifier
-                .size(56.dp)
-                .graphicsLayer {
-                    scaleX = buttonScale
-                    scaleY = buttonScale
-                }
-                .shadow(
-                    elevation = 8.dp,
-                    shape = RoundedCornerShape(18.dp),
-                    ambientColor = FoodRed.copy(alpha = 0.3f),
-                    spotColor = FoodRed.copy(alpha = 0.3f)
+        Box {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .shadow(
+                        elevation = 10.dp,
+                        shape = RoundedCornerShape(18.dp),
+                        ambientColor = FoodRed.copy(alpha = 0.4f),
+                        spotColor = FoodRed.copy(alpha = 0.4f)
+                    )
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(FoodGradient)
+                    .clickable { sortMenuOpen = true },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Tune, contentDescription = "Trier", tint = Color.White)
+            }
+
+            DropdownMenu(
+                expanded = sortMenuOpen,
+                onDismissRequest = { sortMenuOpen = false },
+                modifier = Modifier.background(Color.White)
+            ) {
+                Text(
+                    text = "Trier par",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FoodGray,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
-                .clip(RoundedCornerShape(18.dp))
-                .background(FoodGradient)
-        ) {
-            Icon(
-                Icons.Default.Tune,
-                contentDescription = "Rechercher",
-                tint = Color.White
-            )
+                SortMode.values().forEach { mode ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = mode.label,
+                                fontWeight = if (mode == sortMode) FontWeight.Bold else FontWeight.Normal,
+                                color = if (mode == sortMode) FoodRed else FoodText
+                            )
+                        },
+                        trailingIcon = {
+                            if (mode == sortMode) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = FoodRed)
+                            }
+                        },
+                        onClick = {
+                            onSortChange(mode)
+                            sortMenuOpen = false
+                        }
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun PromoBanner() {
-    val transition = rememberInfiniteTransition(label = "banner")
+private fun OfflinePill(onRetry: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(FoodDark)
+            .clickable(onClick = onRetry)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Default.CloudOff, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = "Hors ligne · menu enregistré sur le téléphone",
+            color = Color.White,
+            fontSize = 13.sp,
+            modifier = Modifier.weight(1f)
+        )
+        Text("Réessayer", color = FoodRedLight, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+// =============================================================
+// CARROUSEL PROMO
+// =============================================================
+
+private data class Promo(
+    val title: String,
+    val subtitle: String,
+    val cta: String,
+    val category: String,
+    val brush: Brush,
+    @DrawableRes val fallbackImage: Int?
+)
+
+@Composable
+private fun PromoCarousel(
+    categories: List<CategoryEntity>,
+    onPromoClick: (String) -> Unit
+) {
+    val promos = remember {
+        listOf(
+            Promo("Livraison offerte", "dès 30 € de commande", "Commander", "Beef", FoodGradient, R.drawable.img),
+            Promo("Envie de sucré ?", "Nos desserts les mieux notés", "Découvrir", "Dessert", FoodSunsetGradient, null),
+            Promo("Fraîcheur marine", "Poissons & fruits de mer", "Explorer", "Seafood", FoodDarkGradient, null)
+        )
+    }
+    val pagerState = rememberPagerState(pageCount = { promos.size })
+
+    // Défilement automatique toutes les 4 secondes
+    LaunchedEffect(pagerState) {
+        while (true) {
+            delay(4000)
+            pagerState.animateScrollToPage((pagerState.currentPage + 1) % promos.size)
+        }
+    }
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        HorizontalPager(
+            state = pagerState,
+            pageSpacing = 12.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) { page ->
+            val promo = promos[page]
+            val image: Any? = promo.fallbackImage
+                ?: categories.firstOrNull { it.name == promo.category }?.thumb
+            PromoCard(promo = promo, image = image, onClick = { onPromoClick(promo.category) })
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            repeat(promos.size) { index ->
+                val selected = pagerState.currentPage == index
+                val width by animateDpAsState(if (selected) 22.dp else 7.dp, label = "dot")
+                val color by animateColorAsState(if (selected) FoodRed else Color(0xFFD9D9DF), label = "dotColor")
+                Box(
+                    Modifier
+                        .height(7.dp)
+                        .width(width)
+                        .clip(CircleShape)
+                        .background(color)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PromoCard(promo: Promo, image: Any?, onClick: () -> Unit) {
+    val transition = rememberInfiniteTransition(label = "promo")
     val bob by transition.animateFloat(
-        initialValue = -6f,
-        targetValue = 6f,
-        animationSpec = infiniteRepeatable(
-            tween(2000, easing = FastOutSlowInEasing),
-            RepeatMode.Reverse
-        ),
+        initialValue = -5f,
+        targetValue = 5f,
+        animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "bob"
     )
     val tilt by transition.animateFloat(
         initialValue = -4f,
         targetValue = 4f,
-        animationSpec = infiniteRepeatable(
-            tween(2600, easing = FastOutSlowInEasing),
-            RepeatMode.Reverse
-        ),
+        animationSpec = infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "tilt"
     )
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(140.dp)
-            .shadow(
-                elevation = 14.dp,
-                shape = RoundedCornerShape(26.dp),
-                ambientColor = FoodRed.copy(alpha = 0.35f),
-                spotColor = FoodRed.copy(alpha = 0.35f)
-            )
+            .height(150.dp)
             .clip(RoundedCornerShape(26.dp))
-            .background(FoodGradient)
+            .background(promo.brush)
+            .clickable(onClick = onClick)
     ) {
         // Bulles décoratives
         Spacer(
             Modifier
-                .size(130.dp)
-                .offset(x = (-35).dp, y = (-45).dp)
+                .size(140.dp)
+                .offset(x = (-40).dp, y = (-50).dp)
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.12f))
         )
         Spacer(
             Modifier
                 .align(Alignment.BottomEnd)
-                .size(90.dp)
-                .offset(x = 20.dp, y = 30.dp)
+                .size(110.dp)
+                .offset(x = 30.dp, y = 40.dp)
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.10f))
         )
@@ -531,26 +513,26 @@ private fun PromoBanner() {
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .padding(start = 20.dp)
-                .fillMaxWidth(0.55f)
+                .fillMaxWidth(0.56f)
         ) {
             Text(
-                text = "Free delivery",
+                text = promo.title,
                 color = Color.White,
                 fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "on your first order",
+                text = promo.subtitle,
                 color = Color.White.copy(alpha = 0.9f),
-                fontSize = 14.sp
+                fontSize = 13.sp,
+                maxLines = 2
             )
             Spacer(Modifier.height(12.dp))
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color.White
-            ) {
+            Surface(shape = RoundedCornerShape(12.dp), color = Color.White) {
                 Text(
-                    text = "Order now",
+                    text = promo.cta,
                     color = FoodRed,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -559,436 +541,129 @@ private fun PromoBanner() {
             }
         }
 
-        Image(
-            painter = painterResource(id = R.drawable.img),
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .offset(x = 24.dp)
-                .size(160.dp)
-                .graphicsLayer {
-                    translationY = bob.dp.toPx()
-                    rotationZ = tilt
-                }
-        )
-    }
-}
-
-@Composable
-private fun CategoryChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val container by animateColorAsState(
-        targetValue = if (selected) FoodRed else Color.White,
-        animationSpec = tween(250),
-        label = "chipBg"
-    )
-    val content by animateColorAsState(
-        targetValue = if (selected) Color.White else FoodGray,
-        animationSpec = tween(250),
-        label = "chipFg"
-    )
-    val scale by animateFloatAsState(
-        targetValue = if (selected) 1.06f else 1f,
-        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium),
-        label = "chipScale"
-    )
-
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        color = container,
-        shadowElevation = if (selected) 6.dp else 1.dp,
-        modifier = Modifier.graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        }
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-            color = content,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MealCard(
-    meal: Meal,
-    isFavorite: Boolean,
-    onFavoriteClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.96f else 1f,
-        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium),
-        label = "cardPress"
-    )
-
-    Card(
-        onClick = { /* TODO : ouvrir le détail du repas */ },
-        interactionSource = interaction,
-        modifier = modifier.graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        },
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 4.dp,
-            pressedElevation = 1.dp
-        )
-    ) {
-        Column(modifier = Modifier.padding(8.dp)) {
-
-            // Image + dégradé + badge catégorie + bouton favori
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp)
-                    .clip(RoundedCornerShape(16.dp))
-            ) {
-                AsyncImage(
-                    model = meal.strMealThumb,
-                    contentDescription = meal.strMeal,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                0.5f to Color.Transparent,
-                                1f to Color(0x80000000)
-                            )
-                        )
-                )
-
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(8.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color.White.copy(alpha = 0.92f)
-                ) {
-                    Text(
-                        text = meal.strCategory ?: "Meal",
-                        color = FoodRed,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-
-                FavoriteButton(
-                    isFavorite = isFavorite,
-                    onClick = onFavoriteClick,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                )
+        val imageModifier = Modifier
+            .align(Alignment.CenterEnd)
+            .offset(x = 18.dp)
+            .size(150.dp)
+            .graphicsLayer {
+                translationY = bob.dp.toPx()
+                rotationZ = tilt
             }
 
-            Spacer(Modifier.height(10.dp))
-
-            Text(
-                text = meal.strMeal,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = FoodText,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 4.dp)
+        if (image is Int) {
+            Image(
+                painter = painterResource(id = image),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = imageModifier
             )
-
-            Spacer(Modifier.height(6.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Place,
-                        contentDescription = null,
-                        tint = FoodRed,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Spacer(Modifier.width(3.dp))
-                    Text(
-                        text = meal.strArea ?: "Cuisine",
-                        fontSize = 12.sp,
-                        color = FoodGray,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(FoodGradient)
-                        .clickable { /* TODO : ajouter au panier */ },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Ajouter",
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** Cœur qui "pop" avec un petit rebond et change de couleur en douceur. */
-@Composable
-private fun FavoriteButton(
-    isFavorite: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val scale = remember { Animatable(1f) }
-    var firstRun by remember { mutableStateOf(true) }
-
-    LaunchedEffect(isFavorite) {
-        if (firstRun) {
-            firstRun = false
-            return@LaunchedEffect
-        }
-        scale.animateTo(1.4f, tween(100))
-        scale.animateTo(
-            1f,
-            spring(Spring.DampingRatioHighBouncy, Spring.StiffnessMedium)
-        )
-    }
-
-    val tint by animateColorAsState(
-        targetValue = if (isFavorite) FoodRed else FoodGray,
-        animationSpec = tween(250),
-        label = "heartTint"
-    )
-
-    Box(
-        modifier = modifier
-            .size(34.dp)
-            .shadow(4.dp, CircleShape)
-            .clip(CircleShape)
-            .background(Color.White)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-            contentDescription = "Ajouter aux favoris",
-            tint = tint,
-            modifier = Modifier
-                .size(18.dp)
-                .graphicsLayer {
-                    scaleX = scale.value
-                    scaleY = scale.value
-                }
-        )
-    }
-}
-
-@Composable
-private fun SkeletonCard(modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(120.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .shimmer()
+        } else if (image != null) {
+            AsyncImage(
+                model = image,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = imageModifier.padding(12.dp)
             )
-            Spacer(Modifier.height(12.dp))
-            Box(
-                Modifier
-                    .fillMaxWidth(0.8f)
-                    .height(14.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .shimmer()
-            )
-            Spacer(Modifier.height(10.dp))
-            Box(
-                Modifier
-                    .fillMaxWidth(0.5f)
-                    .height(12.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .shimmer()
-            )
-            Spacer(Modifier.height(6.dp))
         }
-    }
-}
-
-@Composable
-private fun ErrorState(message: String, onRetry: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            Icons.Default.Warning,
-            contentDescription = null,
-            tint = FoodRed,
-            modifier = Modifier.size(44.dp)
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(message, color = FoodGray)
-        Spacer(Modifier.height(12.dp))
-        Button(
-            onClick = onRetry,
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = FoodRed)
-        ) {
-            Text("Réessayer")
-        }
-    }
-}
-
-@Composable
-private fun EmptyState(isFavorites: Boolean) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = if (isFavorites) Icons.Default.FavoriteBorder else Icons.Default.Search,
-            contentDescription = null,
-            tint = FoodGray,
-            modifier = Modifier.size(44.dp)
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = if (isFavorites) "Aucun favori pour l'instant" else "Aucun repas trouvé.",
-            color = FoodGray
-        )
     }
 }
 
 // =============================================================
-// BARRE DE NAVIGATION FLOTTANTE
+// CATÉGORIES (images venant de l'API)
 // =============================================================
 
 @Composable
-private fun FoodgoBottomBar(
-    selected: Int,
-    onSelect: (Int) -> Unit
+private fun CategoriesRow(
+    categories: List<CategoryEntity>,
+    selected: String,
+    onSelect: (String) -> Unit
 ) {
-    val items = listOf(
-        Icons.Default.Home to "Home",
-        Icons.Default.Favorite to "Favoris",
-        Icons.Default.Receipt to "Commandes",
-        Icons.Default.Person to "Profil"
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(
-                    elevation = 16.dp,
-                    shape = RoundedCornerShape(32.dp),
-                    ambientColor = FoodRed.copy(alpha = 0.4f),
-                    spotColor = FoodRed.copy(alpha = 0.4f)
-                )
-                .clip(RoundedCornerShape(32.dp))
-                .background(FoodGradient)
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+    Column {
+        SectionHeader(title = "Catégories")
+        Spacer(Modifier.height(12.dp))
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp)
         ) {
-            items.forEachIndexed { index, (icon, label) ->
-                NavItem(
-                    icon = icon,
-                    label = label,
-                    selected = selected == index,
-                    onClick = { onSelect(index) }
+            item(key = "All") {
+                CategoryBubble(
+                    label = "Tout",
+                    image = null,
+                    selected = selected == "All",
+                    onClick = { onSelect("All") }
+                )
+            }
+            items(categories, key = { it.name }) { category ->
+                CategoryBubble(
+                    label = category.name,
+                    image = category.thumb,
+                    selected = selected == category.name,
+                    onClick = { onSelect(category.name) }
                 )
             }
         }
     }
 }
 
-/** L'onglet actif devient une pastille blanche qui s'agrandit pour afficher son label. */
 @Composable
-private fun NavItem(
-    icon: ImageVector,
+private fun CategoryBubble(
     label: String,
+    image: String?,
     selected: Boolean,
     onClick: () -> Unit
 ) {
     val background by animateColorAsState(
-        targetValue = if (selected) Color.White else Color.Transparent,
+        targetValue = if (selected) FoodRedSoft else Color.White,
         animationSpec = tween(250),
-        label = "navBg"
+        label = "catBg"
     )
-    val foreground by animateColorAsState(
-        targetValue = if (selected) FoodRed else Color.White,
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) FoodRed else Color.Transparent,
         animationSpec = tween(250),
-        label = "navFg"
+        label = "catBorder"
     )
 
-    Row(
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clip(CircleShape)
-            .animateContentSize(spring(stiffness = Spring.StiffnessMediumLow))
-            .background(background)
+            .width(74.dp)
+            .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = if (selected) 16.dp else 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 4.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = foreground
-        )
-        AnimatedVisibility(visible = selected) {
-            Text(
-                text = label,
-                color = foreground,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                modifier = Modifier.padding(start = 8.dp)
-            )
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .softShadow(radius = 32.dp, elevation = 6.dp, color = Color(0x14000000))
+                .clip(CircleShape)
+                .background(background)
+                .border(2.dp, borderColor, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            if (image.isNullOrBlank()) {
+                Icon(
+                    imageVector = Icons.Default.Restaurant,
+                    contentDescription = null,
+                    tint = FoodRed,
+                    modifier = Modifier.size(28.dp)
+                )
+            } else {
+                AsyncImage(
+                    model = image,
+                    contentDescription = label,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(46.dp)
+                )
+            }
         }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = if (selected) FoodRed else FoodText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
