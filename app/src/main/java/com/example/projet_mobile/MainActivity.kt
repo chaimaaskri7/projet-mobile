@@ -374,7 +374,8 @@ fun FoodgoSplashScreen() {
             Text(
                 text = "Foodgo",
                 color = Color.White,
-                fontSize = 110.sp,
+                // 110 sp sur un téléphone classique, plus petit sur petit écran / paysage
+                fontSize = minOf(110f, minOf(screenWidth.value, screenHeight.value) * 0.27f).sp,
                 fontFamily = FontFamily.Cursive,
                 fontWeight = FontWeight.Bold,
                 fontStyle = FontStyle.Italic,

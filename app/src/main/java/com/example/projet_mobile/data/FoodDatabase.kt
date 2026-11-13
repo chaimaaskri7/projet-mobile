@@ -46,49 +46,10 @@ class Converters {
 @Dao
 interface FoodDao {
 
-    // ---------- Catalogue ----------
-
-    @Query("SELECT COUNT(*) FROM meals")
-    suspend fun mealCount(): Int
-
-    @Query("SELECT COUNT(*) FROM meals")
-    fun observeMealCount(): Flow<Int>
-
-    @Upsert
-    suspend fun upsertMeals(meals: List<MealEntity>)
-
-    @Upsert
-    suspend fun upsertCategories(categories: List<CategoryEntity>)
-
-    @Query("SELECT * FROM categories ORDER BY position")
-    fun observeCategories(): Flow<List<CategoryEntity>>
-
-    @Query(
-        """
-        SELECT * FROM meals
-        WHERE (:category = 'All' OR category = :category)
-          AND (:query = ''
-               OR name LIKE '%' || :query || '%'
-               OR area LIKE '%' || :query || '%'
-               OR category LIKE '%' || :query || '%')
-        ORDER BY rating DESC, name ASC
-        """
-    )
-    fun observeMeals(category: String, query: String): Flow<List<MealEntity>>
-
-    @Query("SELECT * FROM meals WHERE id = :id")
-    fun observeMeal(id: String): Flow<MealEntity?>
-
     // ---------- Favoris ----------
 
-    @Query(
-        """
-        SELECT m.* FROM meals m
-        INNER JOIN favorites f ON f.mealId = m.id
-        ORDER BY f.addedAt DESC
-        """
-    )
-    fun observeFavoriteMeals(): Flow<List<MealEntity>>
+    @Query("SELECT * FROM favorites ORDER BY addedAt DESC")
+    fun observeFavorites(): Flow<List<FavoriteEntity>>
 
     @Query("SELECT mealId FROM favorites")
     fun observeFavoriteIds(): Flow<List<String>>
@@ -104,25 +65,11 @@ interface FoodDao {
 
     // ---------- Panier ----------
 
-    @Query(
-        """
-        SELECT c.mealId AS mealId, m.name AS name, m.thumb AS thumb,
-               m.category AS category, m.price AS price, c.quantity AS quantity
-        FROM cart c INNER JOIN meals m ON m.id = c.mealId
-        ORDER BY c.addedAt ASC
-        """
-    )
-    fun observeCart(): Flow<List<CartLine>>
+    @Query("SELECT * FROM cart ORDER BY addedAt ASC")
+    fun observeCartItems(): Flow<List<CartItemEntity>>
 
-    @Query(
-        """
-        SELECT c.mealId AS mealId, m.name AS name, m.thumb AS thumb,
-               m.category AS category, m.price AS price, c.quantity AS quantity
-        FROM cart c INNER JOIN meals m ON m.id = c.mealId
-        ORDER BY c.addedAt ASC
-        """
-    )
-    suspend fun getCart(): List<CartLine>
+    @Query("SELECT * FROM cart ORDER BY addedAt ASC")
+    suspend fun getCartItems(): List<CartItemEntity>
 
     @Query("SELECT quantity FROM cart WHERE mealId = :id")
     suspend fun cartQuantity(id: String): Int?
@@ -165,14 +112,12 @@ interface FoodDao {
 
 @Database(
     entities = [
-        MealEntity::class,
-        CategoryEntity::class,
         FavoriteEntity::class,
         CartItemEntity::class,
         OrderEntity::class,
         ProfileEntity::class
     ],
-    version = 1,
+    version = 2, // v2 : les plats ne sont plus dans Room (Supabase)
     exportSchema = false
 )
 @TypeConverters(Converters::class)

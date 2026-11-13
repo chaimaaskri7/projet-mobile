@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -106,7 +107,8 @@ private fun MealDetailContent(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(340.dp)
+                        // 340 dp sur téléphone, réduite en paysage (max 45 % de l'écran)
+                        .height(minOf(340, (LocalConfiguration.current.screenHeightDp * 0.45f).toInt()).dp)
                         .background(FoodLightGray)
                 ) {
                     AsyncImage(
