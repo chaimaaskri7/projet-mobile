@@ -8,29 +8,38 @@ import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
 
 /**
- * API TheMealDB (gratuite, sans clé).
- * On récupère TOUT le catalogue en interrogeant chaque lettre de a à z
- * (~300 plats avec ingrédients, recette, vidéo) + les 14 catégories.
+ * API REST Supabase (PostgREST) : les plats sont dans la table "meals".
+ * Les données sont en ligne : il suffit de cloner le projet pour les retrouver.
  */
 interface MealApi {
 
-    /** Tous les plats dont le nom commence par [letter]. */
-    @GET("search.php")
-    suspend fun searchByFirstLetter(
-        @Query("f") letter: String
-    ): MealsResponse
-
-    /** Liste des catégories avec image et description. */
-    @GET("categories.php")
-    suspend fun categories(): CategoriesResponse
+    /** Tous les plats du catalogue. */
+    @GET("meals")
+    suspend fun meals(
+        @Query("select") select: String = "*",
+        @Query("order") order: String = "name.asc"
+    ): List<SupabaseMealDto>
 
     companion object {
-        private const val BASE_URL = "https://www.themealdb.com/api/json/v1/1/"
+        private const val SUPABASE_URL = "https://kexnkzgnomnbdkymiyki.supabase.co"
+
+        // Clé PUBLIQUE (publishable) : prévue pour être embarquée dans l'appli
+        private const val SUPABASE_KEY = "sb_publishable_jTLUyRYG0a402DP7kJHOqw_z_1y-kTo"
+
+        private const val BASE_URL = "$SUPABASE_URL/rest/v1/"
 
         val service: MealApi by lazy {
             val client = OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .addInterceptor { chain ->
+                    chain.proceed(
+                        chain.request().newBuilder()
+                            .addHeader("apikey", SUPABASE_KEY)
+                            .addHeader("Accept", "application/json")
+                            .build()
+                    )
+                }
                 .build()
 
             Retrofit.Builder()

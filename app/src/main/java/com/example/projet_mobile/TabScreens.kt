@@ -56,7 +56,7 @@ fun FavoritesScreen(
     val favorites by vm.favorites.collectAsState()
 
     LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+        columns = GridCells.Adaptive(minSize = 160.dp), // 2 colonnes sur téléphone, plus en paysage / tablette
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = 16.dp,

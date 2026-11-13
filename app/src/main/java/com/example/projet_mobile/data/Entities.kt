@@ -7,10 +7,9 @@ import androidx.room.PrimaryKey
 // TABLES ROOM
 // =============================================================
 
-/** Un plat du catalogue (cache local de l'API → l'appli marche hors ligne). */
-@Entity(tableName = "meals")
+/** Un plat du catalogue (vient de Supabase, gardé en mémoire : PAS dans Room). */
 data class MealEntity(
-    @PrimaryKey val id: String,
+    val id: String,
     val name: String,
     val category: String,
     val area: String,
@@ -31,9 +30,9 @@ data class Ingredient(
     val measure: String
 )
 
-@Entity(tableName = "categories")
+/** Catégorie déduite des plats Supabase (pas dans Room). */
 data class CategoryEntity(
-    @PrimaryKey val name: String,
+    val name: String,
     val thumb: String,
     val description: String,
     val position: Int
@@ -83,7 +82,7 @@ data class ProfileEntity(
     val address: String
 )
 
-/** Résultat d'une jointure panier ⨝ plats (pas une table). */
+/** Ligne du panier = panier (Room) + infos du plat (Supabase). Pas une table. */
 data class CartLine(
     val mealId: String,
     val name: String,
