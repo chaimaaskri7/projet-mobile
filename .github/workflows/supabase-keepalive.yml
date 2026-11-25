@@ -1,0 +1,26 @@
+# Garde le projet Supabase actif.
+# Sur l'offre gratuite, Supabase met le projet en pause après 7 jours sans activité.
+# Cette tâche interroge l'API une fois par jour pour éviter la pause.
+
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: "23 7 * * *"   # tous les jours vers 7h23 (UTC)
+  workflow_dispatch:        # permet aussi de la lancer à la main depuis l'onglet Actions
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Appeler l'API Supabase (table meals)
+        run: |
+          code=$(curl -s -o /tmp/reponse.json -w "%{http_code}" \
+            "https://kexnkzgnomnbdkymiyki.supabase.co/rest/v1/meals?select=id&limit=1" \
+            -H "apikey: sb_publishable_jTLUyRYG0a402DP7kJHOqw_z_1y-kTo")
+          echo "Réponse HTTP : $code"
+          cat /tmp/reponse.json
+          if [ "$code" != "200" ]; then
+            echo "Supabase ne répond pas correctement : vérifier le tableau de bord."
+            exit 1
+          fi

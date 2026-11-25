@@ -64,6 +64,12 @@ Sur Mac ou Linux, la même commande fonctionne avec `curl` au lieu de `curl.exe`
 
 Dans le code, l'appel se trouve dans `MealApi.kt`.
 
+### Éviter la mise en pause de Supabase
+
+Sur l'offre gratuite, Supabase met le projet en pause après 7 jours sans activité. L'application ne pourrait alors plus charger les plats.
+Pour l'éviter, une tâche automatique GitHub Actions (`.github/workflows/supabase-keepalive.yml`) interroge l'API une fois par jour.
+On peut la lancer à la main depuis l'onglet **Actions** du dépôt GitHub (*Supabase keep-alive → Run workflow*).
+
 ---
 
 ## Lancer le projet
